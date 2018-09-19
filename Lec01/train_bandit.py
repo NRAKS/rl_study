@@ -1,3 +1,15 @@
+"""
+python3
+バンディット問題を強化学習するプログラム
+
+スロットマシンは２つ存在していて、それぞれの確率は[0.4, 0.6]
+当たると報酬が１もらえる
+
+方策はgreedyとε-greedyとε減衰の３つ　(このコードにはgreedyしか実装されていない)
+
+残りの二つを実装するのが課題　(このコードを直接編集するなら)
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 import random
@@ -7,7 +19,7 @@ import random
 class Bandit():
     def __init__(self):
         # バンディットの設定
-        self.probability = np.asarray([[0.2, 0.6]])
+        self.probability = np.asarray([[0.4, 0.6]])
         # スタート地点
         self.start = 0
         # ゴール地点
@@ -34,7 +46,7 @@ class Bandit():
     # スタート地点の場所を返す(初期化用)
     def get_start(self):
         return self.start
-    
+
     # ゴール地点の場所を返す
     def get_goal_state(self):
         return self.goal
@@ -48,10 +60,10 @@ class Bandit():
 class Q_learning():
     # 学習率、割引率、状態数、行動数を定義する
     def __init__(self, learning_rate=0.1, discount_rate=0.9, num_state=None, num_action=None):
-        self.learning_rate = learning_rate
-        self.discount_rate = discount_rate
-        self.num_state = num_state
-        self.num_action = num_action
+        self.learning_rate = learning_rate  # 学習率
+        self.discount_rate = discount_rate  # 割引率
+        self.num_state = num_state  # 状態数
+        self.num_action = num_action  # 行動数
         # Qテーブルを初期化
         self.Q = np.zeros((self.num_state+1, self.num_action))
 
@@ -66,8 +78,9 @@ class Q_learning():
         # Q値の更新
         self.Q[current_state, current_action] += self.learning_rate * TD_error
 
+    # Q値の初期化
     def init_params(self):
-        self.Q = np.zeros((self.num_state, self.num_action))
+        self.Q = np.zeros((self.num_state+1, self.num_action))
 
     # Q値を返す
     def get_Q(self):
@@ -104,6 +117,10 @@ class Agent():
     def print_value(self):
         print(self.value_func.get_Q())
 
+    # 所持パラメータの初期化
+    def init_params(self):
+        self.value_func.init_params()
+
 
 # メイン関数
 def main():
@@ -115,26 +132,38 @@ def main():
 
     agent = Agent(n_state=task.get_num_state(), n_action=task.get_num_action())  # エージェントの設定
 
+    sumreward_graph = np.zeros(EPISODE_TIMES)  # グラフ記述用の報酬記録
+
     # トレーニング開始
     print("トレーニング開始")
     for simu in range(SIMULATION_TIMES):
-        current_state = task.get_start()
-
+        agent.init_params()  # エージェントのパラメータを初期化
         for epi in range(EPISODE_TIMES):
+            current_state = task.get_start()  # 現在地をスタート地点に初期化
+
             while True:
                 # 行動選択
                 action = agent.serect_action(current_state)
                 # 報酬を観測
                 reward = task.get_reward(current_state, action)
+                sumreward_graph[epi] += reward
                 # 次状態を観測
                 next_state = task.get_next_state(current_state, action)
                 # Q価の更新
                 agent.update(current_state, action, reward, next_state)
                 # 次状態が終端状態であれば終了
                 if next_state == task.get_goal_state():
-                    break  
+                    break
 
     print("Q値の表示")
     agent.print_value()
+
+    print("グラフ表示")
+    plt.plot(sumreward_graph / SIMULATION_TIMES, label="greedy")  # グラフ書き込み
+    plt.legend()  # 凡例を付ける
+    plt.title("reward")  # グラフタイトルを付ける
+    plt.xlabel("episode")  # x軸のラベルを付ける
+    plt.ylabel("sum reward")  # y軸のラベルを付ける
+    plt.show()  # グラフを表示
 
 main()
