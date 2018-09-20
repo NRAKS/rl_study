@@ -5,9 +5,9 @@ python3
 スロットマシンは２つ存在していて、それぞれの確率は[0.4, 0.6]
 当たると報酬が１もらえる
 
-方策はgreedyとε-greedyとε減衰の３つ　(このコードにはgreedyしか実装されていない)
+方策はgreedyとε-greedyとε減衰の３つ(このコードにはgreedyしか実装されていない)
 
-残りの二つを実装するのが課題　(このコードを直接編集するなら)
+残りの二つを実装するのが課題　(このコードから編集するなら)
 """
 
 import numpy as np
@@ -88,7 +88,7 @@ class Q_learning():
 
 
 # 方策クラス
-class Greedy():
+class Greedy():  # greedy方策
     # 行動価値を受け取って行動番号を返す
     def serect_action(self, value, current_state):
         return np.argmax(value[current_state])
@@ -124,9 +124,9 @@ class Agent():
 
 # メイン関数
 def main():
-
-    task = Bandit()  # タスク定義
     # ハイパーパラメータ等の設定
+    task = Bandit()  # タスク定義
+
     SIMULATION_TIMES = 1  # シミュレーション回数
     EPISODE_TIMES = 100  # エピソード回数
 
