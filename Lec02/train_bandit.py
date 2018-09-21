@@ -13,6 +13,7 @@ python3
 import numpy as np
 import matplotlib.pyplot as plt
 import random
+import sys
 
 
 # バンディットタスク
@@ -88,29 +89,73 @@ class Q_learning():
 
 
 # 方策クラス
-class Greedy():  # greedy方策
+class Greedy(object):  # greedy方策
     # 行動価値を受け取って行動番号を返す
     def serect_action(self, value, current_state):
         return np.argmax(value[current_state])
     
     def init_params(self):
-        
+        pass
+
+    def update_params(self):
+        pass
+
+
+class EpsGreedy(Greedy):
+    def __init__(self, eps):
+        self.eps = eps
+
+    def serect_action(self, value, current_state):
+        if random.random() < self.eps:
+            return random.choice(range(len(value[current_state])))
+
+        else:
+            return np.argmax(value[current_state])
+
+
+class EpsDecGreedy(EpsGreedy):
+    def __init__(self, eps, eps_min, eps_decrease):
+        super().__init__(eps)
+        self.eps_init = eps
+        self.eps_min = eps_min
+        self.eps_decrease = eps_decrease
+
+    def init_params(self):
+        self.eps = self.eps_init
+
+    def update_params(self):
+        self.eps -= self.eps_decrease
 
 
 # エージェントクラス
 class Agent():
-    def __init__(self, value_func="Q_learning", policy="greedy", learning_rate=0.1, discount_rate=0.9, n_state=None, n_action=None):
+    def __init__(self, value_func="Q_learning", policy="greedy", learning_rate=0.1, discount_rate=0.9, eps=None, eps_min=None, eps_decrease=None, n_state=None, n_action=None):
         # 価値更新方法の選択
         if value_func == "Q_learning":
             self.value_func = Q_learning(num_state=n_state, num_action=n_action)
+        
+        else:
+            print("error:価値関数候補が見つかりませんでした")
+            sys.exit()
 
         # 方策の選択
         if policy == "greedy":
             self.policy = Greedy()
+        
+        elif policy == "eps_greedy":
+            self.policy = EpsGreedy(eps=eps)
+
+        elif policy == "eps_dec_greedy":
+            self.policy = EpsDecGreedy(eps=eps, eps_min=eps_min, eps_decrease=eps_decrease)
+
+        else:
+            print("error:方策候補が見つかりませんでした")
+            sys.exit()
 
     # パラメータ更新(基本呼び出し)
     def update(self, current_state, current_action, reward, next_state):
         self.value_func.update_Q(current_state, current_action, reward, next_state)
+        self.policy.update_params()
 
     # 行動選択(基本呼び出し)
     def serect_action(self, current_state):
@@ -123,6 +168,7 @@ class Agent():
     # 所持パラメータの初期化
     def init_params(self):
         self.value_func.init_params()
+        self.policy.init_params()
 
 
 # メイン関数
@@ -130,39 +176,50 @@ def main():
     # ハイパーパラメータ等の設定
     task = Bandit()  # タスク定義
 
-    SIMULATION_TIMES = 1  # シミュレーション回数
+    SIMULATION_TIMES = 1000 # シミュレーション回数
     EPISODE_TIMES = 100  # エピソード回数
 
-    agent = Agent(n_state=task.get_num_state(), n_action=task.get_num_action())  # エージェントの設定
+    # エージェントの設定
+    agent = {}
+    agent[0] = Agent(policy="greedy", n_state=task.get_num_state(), n_action=task.get_num_action())
+    agent[1] = Agent(policy="eps_greedy", eps=0.1, n_state=task.get_num_state(), n_action=task.get_num_action())
+    agent[2] = Agent(policy="eps_dec_greedy", eps=1.0, eps_min=0.0, eps_decrease=0.01, n_state=task.get_num_state(), n_action=task.get_num_action())
 
-    sumreward_graph = np.zeros(EPISODE_TIMES)  # グラフ記述用の報酬記録
+    reward_graph = np.zeros((len(agent), EPISODE_TIMES))  # グラフ記述用の報酬記録
 
     # トレーニング開始
     print("トレーニング開始")
     for simu in range(SIMULATION_TIMES):
-        agent.init_params()  # エージェントのパラメータを初期化
+        for n_agent in range(len(agent)):
+            agent[n_agent].init_params()  # エージェントのパラメータを初期化
+
         for epi in range(EPISODE_TIMES):
             current_state = task.get_start()  # 現在地をスタート地点に初期化
 
-            while True:
-                # 行動選択
-                action = agent.serect_action(current_state)
-                # 報酬を観測
-                reward = task.get_reward(current_state, action)
-                sumreward_graph[epi] += reward
-                # 次状態を観測
-                next_state = task.get_next_state(current_state, action)
-                # Q価の更新
-                agent.update(current_state, action, reward, next_state)
-                # 次状態が終端状態であれば終了
-                if next_state == task.get_goal_state():
-                    break
+            for n_agent in range(len(agent)):
+                while True:
+                    # 行動選択
+                    action = agent[n_agent].serect_action(current_state)
+                    # 報酬を観測
+                    reward = task.get_reward(current_state, action)
+                    reward_graph[n_agent, epi] += reward
+                    # 次状態を観測
+                    next_state = task.get_next_state(current_state, action)
+                    # Q価の更新
+                    agent[n_agent].update(current_state, action, reward, next_state)
+                    # 次状態が終端状態であれば終了
+                    if next_state == task.get_goal_state():
+                        break
 
     print("Q値の表示")
-    agent.print_value()
+    for n_agent in range(len(agent)):
+        agent[n_agent].print_value()
 
     print("グラフ表示")
-    plt.plot(sumreward_graph / SIMULATION_TIMES, label="greedy")  # グラフ書き込み
+    # グラフ書き込み
+    plt.plot(reward_graph[0] / SIMULATION_TIMES, label="greedy")
+    plt.plot(reward_graph[1] / SIMULATION_TIMES, label="eps_greedy")
+    plt.plot(reward_graph[2] / SIMULATION_TIMES, label="eps_dec_greedy")
     plt.legend()  # 凡例を付ける
     plt.title("reward")  # グラフタイトルを付ける
     plt.xlabel("episode")  # x軸のラベルを付ける
