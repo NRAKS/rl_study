@@ -91,7 +91,7 @@ class Q_learning():
 # 方策クラス
 class Greedy(object):  # greedy方策
     # 行動価値を受け取って行動番号を返す
-    def serect_action(self, value, current_state):
+    def select_action(self, value, current_state):
         return np.argmax(value[current_state])
     
     def init_params(self):
@@ -105,7 +105,7 @@ class EpsGreedy(Greedy):
     def __init__(self, eps):
         self.eps = eps
 
-    def serect_action(self, value, current_state):
+    def select_action(self, value, current_state):
         if random.random() < self.eps:
             return random.choice(range(len(value[current_state])))
 
@@ -158,8 +158,8 @@ class Agent():
         self.policy.update_params()
 
     # 行動選択(基本呼び出し)
-    def serect_action(self, current_state):
-        return self.policy.serect_action(self.value_func.get_Q(), current_state)
+    def select_action(self, current_state):
+        return self.policy.select_action(self.value_func.get_Q(), current_state)
 
     # 行動価値の表示
     def print_value(self):
@@ -176,7 +176,7 @@ def main():
     # ハイパーパラメータ等の設定
     task = Bandit()  # タスク定義
 
-    SIMULATION_TIMES = 1000 # シミュレーション回数
+    SIMULATION_TIMES = 1000  # シミュレーション回数
     EPISODE_TIMES = 100  # エピソード回数
 
     # エージェントの設定
@@ -199,7 +199,7 @@ def main():
             for n_agent in range(len(agent)):
                 while True:
                     # 行動選択
-                    action = agent[n_agent].serect_action(current_state)
+                    action = agent[n_agent].select_action(current_state)
                     # 報酬を観測
                     reward = task.get_reward(current_state, action)
                     reward_graph[n_agent, epi] += reward

@@ -132,7 +132,7 @@ def main():
 
     agent = Agent(n_state=task.get_num_state(), n_action=task.get_num_action())  # エージェントの設定
 
-    sumreward_graph = np.zeros(EPISODE_TIMES)  # グラフ記述用の報酬記録
+    reward_graph = np.zeros(EPISODE_TIMES)  # グラフ記述用の報酬記録
 
     # トレーニング開始
     print("トレーニング開始")
@@ -146,7 +146,7 @@ def main():
                 action = agent.serect_action(current_state)
                 # 報酬を観測
                 reward = task.get_reward(current_state, action)
-                sumreward_graph[epi] += reward
+                reward_graph[epi] += reward
                 # 次状態を観測
                 next_state = task.get_next_state(current_state, action)
                 # Q価の更新
@@ -159,7 +159,7 @@ def main():
     agent.print_value()
 
     print("グラフ表示")
-    plt.plot(sumreward_graph / SIMULATION_TIMES, label="greedy")  # グラフ書き込み
+    plt.plot(reward_graph / SIMULATION_TIMES, label="greedy")  # グラフ書き込み
     plt.legend()  # 凡例を付ける
     plt.title("reward")  # グラフタイトルを付ける
     plt.xlabel("episode")  # x軸のラベルを付ける

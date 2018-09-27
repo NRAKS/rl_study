@@ -142,7 +142,7 @@ class Q_learning():
 # 方策クラス
 class Greedy(object):  # greedy方策
     # 行動価値を受け取って行動番号を返す
-    def serect_action(self, value, current_state):
+    def select_action(self, value, current_state):
         idx = np.where(value[current_state] == max(value[current_state]))
         return random.choice(idx[0])
     
@@ -157,12 +157,12 @@ class EpsGreedy(Greedy):
     def __init__(self, eps):
         self.eps = eps
 
-    def serect_action(self, value, current_state):
+    def select_action(self, value, current_state):
         if random.random() < self.eps:
             return random.choice(range(len(value[current_state])))
 
         else:
-            return super().serect_action(value, current_state)
+            return super().select_action(value, current_state)
 
 
 class EpsDecGreedy(EpsGreedy):
@@ -210,8 +210,8 @@ class Agent():
         self.policy.update_params()
 
     # 行動選択(基本呼び出し)
-    def serect_action(self, current_state):
-        return self.policy.serect_action(self.value_func.get_Q(), current_state)
+    def select_action(self, current_state):
+        return self.policy.select_action(self.value_func.get_Q(), current_state)
 
     # 行動価値の表示
     def print_value(self):
@@ -227,7 +227,7 @@ class Agent():
 def main():
     # ハイパーパラメータ等の設定
     task = GlidWorld(row=7, col=7, start=0, goal=48)  # タスク定義
-    SIMULATION_TIMES = 100 # シミュレーション回数
+    SIMULATION_TIMES = 100  # シミュレーション回数
     EPISODE_TIMES = 1000  # エピソード回数
 
     # エージェントの設定
@@ -254,7 +254,7 @@ def main():
 
                 while True:
                     # 行動選択
-                    action = agent[n_agent].serect_action(current_state)
+                    action = agent[n_agent].select_action(current_state)
                     # 次状態を観測
                     next_state = task.get_next_state(current_state, action)
                     # 報酬を観測
@@ -297,7 +297,6 @@ def main():
     plt.show()  # グラフを表示
 
     plt.figure()
-
 
 
 main()
