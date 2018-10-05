@@ -7,6 +7,7 @@ python3
 このコードから編集するなら、グリッドワールドに崖(マイナス報酬部分のマス)の環境を実装、sarsaを実装
 """
 
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import random
@@ -108,8 +109,21 @@ class GlidWorld(Environment):
             return 0
 
 
+class CriffWorld(GlidWorld):
+    def __init__(self, row, col, start, goal, criff_state):
+        super().__init__(row, col, start, goal)
+        self.criff_state = criff_state
+
+    def get_reward(self, state):
+        if state == self.goal_state:
+            return 1
+        elif state in self.criff_state:
+            return -100
+        else:
+            return 0
+
 # Q学習のクラス
-class Q_learning():
+class Q_learning(object):
     # 学習率、割引率、状態数、行動数を定義する
     def __init__(self, learning_rate=0.1, discount_rate=0.9, num_state=None, num_action=None):
         self.learning_rate = learning_rate  # 学習率
@@ -137,6 +151,19 @@ class Q_learning():
     # Q値を返す
     def get_Q(self):
         return self.Q
+
+class Sarsa(Q_learning):
+    def update_Q(self, current_state, current_action, reward, next_state, next_action):
+        # TD誤差の計算
+        TD_error = (
+            reward
+            + self.discount_rate
+            * self.Q[next_state, next_action]
+            - self.Q[current_state, current_action]
+        )
+
+        # Q値の更新
+        self.Q[current_state, current_action] += self.learning_rate * TD_error
 
 
 # 方策クラス
@@ -183,8 +210,12 @@ class EpsDecGreedy(EpsGreedy):
 class Agent():
     def __init__(self, value_func="Q_learning", policy="greedy", learning_rate=0.1, discount_rate=0.9, eps=None, eps_min=None, eps_decrease=None, n_state=None, n_action=None):
         # 価値更新方法の選択
+        self.value_func_name = value_func
         if value_func == "Q_learning":
             self.value_func = Q_learning(num_state=n_state, num_action=n_action)
+        
+        elif value_func == "sarsa":
+            self.value_func = Sarsa(num_state=n_state, num_action=n_action)
         
         else:
             print("error:価値関数候補が見つかりませんでした")
@@ -206,7 +237,13 @@ class Agent():
 
     # パラメータ更新(基本呼び出し)
     def update(self, current_state, current_action, reward, next_state):
-        self.value_func.update_Q(current_state, current_action, reward, next_state)
+        if self.value_func_name == "Q_learning":
+            self.value_func.update_Q(current_state, current_action, reward, next_state)
+
+        elif self.value_func_name == "sarsa":
+            next_action = self.select_action(next_state)
+            self.value_func.update_Q(current_state, current_action, reward, next_state, next_action)
+
         self.policy.update_params()
 
     # 行動選択(基本呼び出し)
@@ -225,16 +262,29 @@ class Agent():
 
 # メイン関数
 def main():
+    parser = argparse.ArgumentParser("Reinforcement Learning")
+    # シミュレーション設定
+    parser.add_argument("--simulation_times", type=int, default=1000, help="setting simulation times")
+    parser.add_argument("--episode_times", type=int, default=1000, help="setting episode times")
+
+    arglist = parser.parse_args()
+
     # ハイパーパラメータ等の設定
-    task = GlidWorld(row=7, col=7, start=0, goal=48)  # タスク定義
-    SIMULATION_TIMES = 100  # シミュレーション回数
-    EPISODE_TIMES = 1000  # エピソード回数
+    # task = GlidWorld(row=7, col=7, start=0, goal=48)  # タスク定義
+    task = CriffWorld(row=7, col=7, start=42, goal=48, criff_state=[43, 44, 45, 46, 47])
+
+    SIMULATION_TIMES = arglist.simulation_times  # シミュレーション回数
+    EPISODE_TIMES = arglist.episode_times  # エピソード回数
 
     # エージェントの設定
     agent = {}
-    agent[0] = Agent(policy="greedy", n_state=task.get_num_state(), n_action=task.get_num_action())
-    agent[1] = Agent(policy="eps_greedy", eps=0.1, n_state=task.get_num_state(), n_action=task.get_num_action())
-    agent[2] = Agent(policy="eps_dec_greedy", eps=1.0, eps_min=0.0, eps_decrease=0.001, n_state=task.get_num_state(), n_action=task.get_num_action())
+    agent[0] = Agent(value_func="Q_learning", policy="greedy", n_state=task.get_num_state(), n_action=task.get_num_action())
+    agent[1] = Agent(value_func="Q_learning", policy="eps_greedy", eps=0.1, n_state=task.get_num_state(), n_action=task.get_num_action())
+    agent[2] = Agent(value_func="Q_learning", policy="eps_dec_greedy", eps=1.0, eps_min=0.0, eps_decrease=0.001, n_state=task.get_num_state(), n_action=task.get_num_action())
+
+    agent[3] = Agent(value_func="sarsa", policy="greedy", n_state=task.get_num_state(), n_action=task.get_num_action())
+    agent[4] = Agent(value_func="sarsa", policy="eps_greedy", eps=0.1, n_state=task.get_num_state(), n_action=task.get_num_action())
+    agent[5] = Agent(value_func="sarsa", policy="eps_dec_greedy", eps=1.0, eps_min=0.0, eps_decrease=0.001, n_state=task.get_num_state(), n_action=task.get_num_action())
 
     # グラフ記述用の記録
     reward_graph = np.zeros((len(agent), EPISODE_TIMES))
@@ -266,18 +316,17 @@ def main():
                     current_state = next_state
                     # 次状態が終端状態であれば終了
                     if next_state == task.get_goal_state() or step == 100:
-                        step_graph[n_agent, epi] = step
+                        step_graph[n_agent, epi] += step
                         break
 
     # print("Q値の表示")
     # for n_agent in range(len(agent)):
-        # agent[n_agent].print_value()
+    #     agent[n_agent].print_value()
 
     print("グラフ表示")
     # グラフ書き込み
-    plt.plot(reward_graph[0] / SIMULATION_TIMES, label="greedy")
-    plt.plot(reward_graph[1] / SIMULATION_TIMES, label="eps_greedy")
-    plt.plot(reward_graph[2] / SIMULATION_TIMES, label="eps_dec_greedy")
+    for n in range(len(agent)):
+        plt.plot(reward_graph[n] / SIMULATION_TIMES, label="agent_{}" .format(n))
     plt.legend()  # 凡例を付ける
     plt.title("reward")  # グラフタイトルを付ける
     plt.xlabel("episode")  # x軸のラベルを付ける
@@ -287,13 +336,12 @@ def main():
     plt.figure()
 
     print("ステップ数表示")
-    plt.plot(step_graph[0] / SIMULATION_TIMES, label="greedy")
-    plt.plot(step_graph[1] / SIMULATION_TIMES, label="eps_greedy")
-    plt.plot(step_graph[2] / SIMULATION_TIMES, label="eps_dec_greedy")
+    for n in range(len(agent)):
+        plt.plot(step_graph[n] / SIMULATION_TIMES, label="agent_{}" .format(n))
     plt.legend()  # 凡例を付ける
     plt.title("step")  # グラフタイトルを付ける
     plt.xlabel("episode")  # x軸のラベルを付ける
-    plt.ylabel("sum reward")  # y軸のラベルを付ける
+    plt.ylabel("step")  # y軸のラベルを付ける
     plt.show()  # グラフを表示
 
     plt.figure()
